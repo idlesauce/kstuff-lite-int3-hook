@@ -161,6 +161,21 @@ static int bind_mount_all_titles(const char* path) {
     return 0;
 }
 
+static int scan_and_mount_titles(void) {
+    const char* marker = automount_disabled_marker();
+
+    if (marker) {
+        return 0;
+    }
+
+    if (bind_mount_all_titles("/user/app") < 0) {
+        klog_perror("Failed to bind mount /user/app titles");
+        return -1;
+    }
+
+    return 0;
+}
+
 static int monitor_usb_changes(void) {
     struct kevent evt;
     int kq;
@@ -183,8 +198,8 @@ static int monitor_usb_changes(void) {
             break;
         }
 
-        if (bind_mount_all_titles("/user/app") < 0) {
-            klog_perror("Failed to bind mount /user/app titles after USB change");
+        if (scan_and_mount_titles() < 0) {
+            klog_perror("Failed to scan and bind mount titles after USB change");
         }
     }
 
@@ -259,14 +274,9 @@ int main(void) {
         *args->payloadout = patch_app_db();
     }
 
-    if (automount_disabled()) {
-        klog_printf("Automount disabled by /data/.kstuff_noautomount\n");
-        return 0;
-    }
-
     klog_printf("Remounting /system_ex and mounting titles...\n");
     remount_system_ex();
-    bind_mount_all_titles("/user/app");
+    scan_and_mount_titles();
 
     monitor_usb_changes();
 
